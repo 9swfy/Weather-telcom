@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>منصة الأنواء الجوية ومحطات الاتصالات الذكية</title>
+    <!-- مكتبة Tailwind CSS للتصميم -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- خط Cairo العربي -->
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <!-- مكتبة الخرائط Leaflet.js -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <!-- مكتبة الرسوم البيانية Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- مكتبة الأيقونات FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        body { font-family: 'Cairo', sans-serif; }
+        #map { height: 350px; border-radius: 0.75rem; }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen">
+
+    <!-- شريط التنقل العلوي -->
+    <header class="bg-slate-800 border-b border-slate-700 sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center">
+            <div class="flex items-center space-x-3 space-x-reverse">
+                <div class="bg-blue-600 p-2 rounded-lg text-white">
+                    <i class="fa-solid fa-tower-broadcast text-xl"></i>
+                </div>
+                <div>
+                    <h1 id="app-title" class="text-lg font-bold">محطة طقس الاتصالات الذكية</h1>
+                    <p id="app-subtitle" class="text-xs text-slate-400">Weather & Telecom IoT Dashboard</p>
+                </div>
+            </div>
+            
+            <div class="flex items-center space-x-2 space-x-reverse">
+                <!-- زر تغيير اللغة -->
+                <button onclick="toggleLanguage()" class="bg-slate-700 hover:bg-slate-600 px-3 py-1.5 rounded-lg text-sm font-medium transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-globe"></i>
+                    <span id="lang-btn-text">English</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- المحتوى الرئيسي -->
+    <main class="max-w-7xl mx-auto px-4 py-6 space-y-6">
+
+        <!-- بطاقات المؤشرات الحية -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <!-- درجة الحرارة -->
+            <div class="bg-slate-800 border border-slate-700 p-4 rounded-xl shadow-lg relative overflow-hidden">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <p id="label-temp" class="text-xs text-slate-400 font-medium">درجة الحرارة</p>
+                        <h3 id="val-temp" class="text-2xl font-bold mt-1">38°C</h3>
+                    </div>
+                    <div class="bg-amber-500/10 text-amber-500 p-3 rounded-lg">
+                        <i class="fa-solid fa-temperature-high text-xl"></i>
+                    </div>
+                </div>
+                <div class="mt-3 text-xs text-amber-400 flex items-center gap-1">
+                    <i class="fa-solid fa-triangle-exclamation"></i> <span id="status-temp">تأثير متوسط على الأبراج</span>
+                </div>
+            </div>
+
+            <!-- الرطوبة -->
+            <div class="bg-slate-800 border border-slate-700 p-4 rounded-xl shadow-lg relative overflow-hidden">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <p id="label-humidity" class="text-xs text-slate-400 font-medium">نسبة الرطوبة</p>
+                        <h3 id="val-humidity" class="text-2xl font-bold mt-1">45%</h3>
+                    </div>
+                    <div class="bg-blue-500/10 text-blue-500 p-3 rounded-lg">
+                        <i class="fa-solid fa-droplet text-xl"></i>
+                    </div>
+                </div>
+                <div class="mt-3 text-xs text-blue-400 flex items-center gap-1">
+                    <i class="fa-solid fa-circle-check"></i> <span id="status-humidity">ضمن الحدود الطبيعية</span>
+                </div>
+            </div>
+
+            <!-- سرعة الرياح -->
+            <div class="bg-slate-800 border border-slate-700 p-4 rounded-xl shadow-lg relative overflow-hidden">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <p id="label-wind" class="text-xs text-slate-400 font-medium">سرعة الرياح والغبار</p>
+                        <h3 id="val-wind" class="text-2xl font-bold mt-1">18 كم/س</h3>
+                    </div>
+                    <div class="bg-teal-500/10 text-teal-500 p-3 rounded-lg">
+                        <i class="fa-solid fa-wind text-xl"></i>
+                    </div>
+                </div>
+                <div class="mt-3 text-xs text-teal-400 flex items-center gap-1">
+                    <i class="fa-solid fa-shield-halved"></i> <span id="status-wind">استقرار في الإشارة</span>
+                </div>
+            </div>
+
+            <!-- معامل توهين الإشارة -->
+            <div class="bg-slate-800 border border-slate-700 p-4 rounded-xl shadow-lg relative overflow-hidden">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <p id="label-attenuation" class="text-xs text-slate-400 font-medium">فقدان الإشارة (RF Attenuation)</p>
+                        <h3 id="val-attenuation" class="text-2xl font-bold mt-1">1.2 dB</h3>
+                    </div>
+                    <div class="bg-purple-500/10 text-purple-500 p-3 rounded-lg">
+                        <i class="fa-solid fa-wave-square text-xl"></i>
+                    </div>
+                </div>
+                <div class="mt-3 text-xs text-purple-400 flex items-center gap-1">
+                    <i class="fa-solid fa-signal"></i> <span id="status-attenuation">جودة ممتازة للـ 5G</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- قسم الخريطة والرسوم البيانية -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- خريطة الأبراج -->
+            <div class="lg:col-span-1 bg-slate-800 border border-slate-700 p-4 rounded-xl shadow-lg flex flex-col">
+                <h2 id="map-heading" class="text-base font-bold mb-3 flex items-center gap-2">
+                    <i class="fa-solid fa-map-location-dot text-blue-500"></i> خريطة محطات الأبراج الموزعة
+                </h2>
+                <div id="map" class="flex-grow"></div>
+            </div>
+
+            <!-- الرسم البياني للطقس والاتصالات -->
+            <div class="lg:col-span-2 bg-slate-800 border border-slate-700 p-4 rounded-xl shadow-lg flex flex-col">
+                <div class="flex justify-between items-center mb-3">
+                    <h2 id="chart-heading" class="text-base font-bold flex items-center gap-2">
+                        <i class="fa-solid fa-chart-line text-blue-500"></i> تحليل تغيرات الحرارة وفقدان الإشارة (24 ساعة)
+                    </h2>
+                    <button onclick="refreshData()" class="bg-blue-600 hover:bg-blue-500 text-white text-xs px-3 py-1.5 rounded-lg transition flex items-center gap-1">
+                        <i class="fa-solid fa-rotate"></i> <span id="btn-refresh">تحديث البيانات</span>
+                    </button>
+                </div>
+                <div class="flex-grow relative h-72">
+                    <canvas id="weatherChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- سجل التنبيهات وجدول البيانات الحية -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- نظام محاكاة الطوارئ والتنبيهات -->
+            <div class="bg-slate-800 border border-slate-700 p-4 rounded-xl shadow-lg space-y-4">
+                <h2 id="alert-heading" class="text-base font-bold flex items-center gap-2">
+                    <i class="fa-solid fa-triangle-exclamation text-amber-500"></i> محاكاة الإنذار المبكر
+                </h2>
+                <p id="alert-desc" class="text-xs text-slate-400">قم بتجربة محاكاة الطقس السيء لمعرفة مدى تأثيره التلقائي على أداء الشبكة:</p>
+                
+                <div class="space-y-2">
+                    <button onclick="simulateWeather('dust')" class="w-full bg-amber-600/20 hover:bg-amber-600/30 text-amber-400 border border-amber-600/40 py-2 px-3 rounded-lg text-sm transition flex items-center justify-between">
+                        <span id="sim-dust">عاصفة ترابية شديدة</span>
+                        <i class="fa-solid fa-wind"></i>
+                    </button>
+                    <button onclick="simulateWeather('rain')" class="w-full bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 border border-blue-600/40 py-2 px-3 rounded-lg text-sm transition flex items-center justify-between">
+                        <span id="sim-rain">أمطار غزيرة وعواصف</span>
+                        <i class="fa-solid fa-cloud-rain"></i>
+                    </button>
+                    <button onclick="simulateWeather('normal')" class="w-full bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 border border-emerald-600/40 py-2 px-3 rounded-lg text-sm transition flex items-center justify-between">
+                        <span id="sim-normal">إعادة الحالة الطبيعية</span>
+                        <i class="fa-solid fa-sun"></i>
+                    </button>
+                </div>
+
+                <div class="bg-slate-900 p-3 rounded-lg border border-slate-700">
+                    <span id="log-title" class="text-xs font-bold text-slate-400 block mb-1">سجل التنبيهات الحية:</span>
+                    <div id="live-log" class="text-xs text-emerald-400 font-mono">النظام يعمل باستقرار تام. لا توجد معوقات جوية.</div>
+                </div>
+            </div>
+
+            <!-- جدول سجلات الحساسات (IoT Data Logs) -->
+            <div class="lg:col-span-2 bg-slate-800 border border-slate-700 p-4 rounded-xl shadow-lg flex flex-col">
+                <div class="flex justify-between items-center mb-3">
+                    <h2 id="table-heading" class="text-base font-bold flex items-center gap-2">
+                        <i class="fa-solid fa-database text-blue-500"></i> سجل قراءات المحطات (IoT Streams)
+                    </h2>
+                    <button onclick="exportCSV()" class="bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs px-3 py-1.5 rounded-lg transition flex items-center gap-1">
+                        <i class="fa-solid fa-download"></i> <span id="btn-export">تصدير CSV</span>
+                    </button>
+                </div>
+                
+                <div class="overflow-x-auto flex-grow">
+                    <table class="w-full text-right text-xs">
+                        <thead>
+                            <tr class="border-b border-slate-700 text-slate-400">
+                                <th class="py-2 px-3" id="th-time">الوقت</th>
+                                <th class="py-2 px-3" id="th-station">المحطة / البرج</th>
+                                <th class="py-2 px-3" id="th-t">الحرارة</th>
+                                <th class="py-2 px-3" id="th-h">الرطوبة</th>
+                                <th class="py-2 px-3" id="th-atten">فقدان الإشارة</th>
+                                <th class="py-2 px-3" id="th-status">الحالة</th>
+                            </tr>
+                        </thead>
+                        <tbody id="log-table-body" class="divide-y divide-slate-700/50 font-mono text-slate-300">
+                            <tr>
+                                <td class="py-2 px-3">11:30 AM</td>
+                                <td class="py-2 px-3">برج المركز الرئيسي (#01)</td>
+                                <td class="py-2 px-3">38°C</td>
+                                <td class="py-2 px-3">45%</td>
+                                <td class="py-2 px-3">1.2 dB</td>
+                                <td class="py-2 px-3 text-emerald-400"><span id="st-stable">مستقر</span></td>
+                            </tr>
+                            <tr>
+                                <td class="py-2 px-3">11:15 AM</td>
+                                <td class="py-2 px-3">محطة الضواحي الشمالية (#02)</td>
+                                <td class="py-2 px-3">39°C</td>
+                                <td class="py-2 px-3">42%</td>
+                                <td class="py-2 px-3">1.4 dB</td>
+                                <td class="py-2 px-3 text-emerald-400"><span id="st-stable2">مستقر</span></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- الفوتر -->
+    <footer class="text-center py-4 text-xs text-slate-500 border-t border-slate-800 mt-8">
+        <span id="footer-text">منصة تحليل الأنواء الجوية واتصالات الـ IoT - مشروع تخرج وتطوير برمجي متقدم</span>
+    </footer>
+
+    <!-- سكريبت البرمجة والتفاعل -->
+    <script>
+        // إعداد الخريطة
+        const map = L.map('map').setView([30.5085, 47.7835], 12);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; OpenStreetMap'
+        }).addTo(map);
+
+        // إضافة مواقع الأبراج
+        const towers = [
+            { lat: 30.5085, lng: 47.7835, name: 'البرج الرئيسي - المركز', status: 'مستقر' },
+            { lat: 30.5300, lng: 47.8000, name: 'محطة الشمال', status: 'مستقر' },
+            { lat: 30.4800, lng: 47.7500, name: 'محطة الجنوب', status: 'تحذير خفيف' }
+        ];
+
+        towers.forEach(t => {
+            L.marker([t.lat, t.lng]).addTo(map)
+              .bindPopup(`<b>${t.name}</b><br>الحالة: ${t.status}`);
+        });
+
+        // إعداد الرسم البياني Chart.js
+        const ctx = document.getElementById('weatherChart').getContext('2d');
+        const weatherChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: ['12:00', '03:00', '06:00', '09:00', '12:00', '15:00', '18:00', '21:00'],
+                datasets: [{
+                    label: 'درجة الحرارة (°C)',
+                    data: [30, 28, 27, 34, 40, 42, 39, 35],
+                    borderColor: '#f59e0b',
+                    backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                    tension: 0.3,
+                    fill: true
+                }, {
+                    label: 'فقدان الإشارة (dB)',
+                    data: [0.8, 0.7, 0.7, 1.1, 1.8, 2.0, 1.5, 1.0],
+                    borderColor: '#3b82f6',
+                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                    tension: 0.3,
+                    fill: true
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { labels: { color: '#cbd5e1', font: { family: 'Cairo' } } }
+                },
+                scales: {
+                    x: { ticks: { color: '#94a3b8' }, grid: { color: '#334155' } },
+                    y: { ticks: { color: '#94a3b8' }, grid: { color: '#334155' } }
+                }
+            }
+        });
+
+        // دالة محاكاة الطقس
+        function simulateWeather(type) {
+            const tempVal = document.getElementById('val-temp');
+            const humVal = document.getElementById('val-humidity');
+            const windVal = document.getElementById('val-wind');
+            const attVal = document.getElementById('val-attenuation');
+            const logBox = document.getElementById('live-log');
+
+            if(type === 'dust') {
+                tempVal.innerText = "44°C";
+                humVal.innerText = "15% (غبار شديد)";
+                windVal.innerText = "45 كم/س";
+                attVal.innerText = "3.8 dB";
+                logBox.className = "text-xs text-amber-400 font-mono";
+                logBox.innerText = "تحذير: عاصفة ترابية تؤدي لتشتت موجات الميكروويف وزيادة التوهين!";
+            } else if(type === 'rain') {
+                tempVal.innerText = "24°C";
+                humVal.innerText = "92% (أمطار غزيرة)";
+                windVal.innerText = "25 كم/س";
+                attVal.innerText = "4.5 dB";
+                logBox.className = "text-xs text-blue-400 font-mono";
+                logBox.innerText = "تنبيه: امتصاص قطرات المطر يؤدي إلى اضمحلال حزم الـ 5G العالية!";
+            } else {
+                tempVal.innerText = "38°C";
+                humVal.innerText = "45%";
+                windVal.innerText = "18 كم/س";
+                attVal.innerText = "1.2 dB";
+                logBox.className = "text-xs text-emerald-400 font-mono";
+                logBox.innerText = "النظام يعمل باستقرار تام. لا توجد معوقات جوية.";
+            }
+        }
+
+        function refreshData() {
+            alert("تم تحديث البيانات وقراءات المحطات بنجاح!");
+        }
+
+        function exportCSV() {
+            let csvContent = "data:text/csv;charset=utf-8,Time,Station,Temp,Humidity,Attenuation,Status\n";
+            csvContent += "11:30 AM,Main Tower,38C,45%,1.2 dB,Stable\n";
+            csvContent += "11:15 AM,North Station,39C,42%,1.4 dB,Stable\n";
+            
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", "telecom_weather_log.csv");
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        // نظام تبديل اللغة (عربي / إنجليزي بسيط)
+        let currentLang = 'ar';
+        function toggleLanguage() {
+            const html = document.documentElement;
+            if(currentLang === 'ar') {
+                currentLang = 'en';
+                html.setAttribute('dir', 'ltr');
+                html.setAttribute('lang', 'en');
+                document.getElementById('lang-btn-text').innerText = "عربي";
+                document.getElementById('app-title').innerText = "Smart Telecom Weather Station";
+                document.getElementById('app-subtitle').innerText = "Weather & Telecom IoT Dashboard";
+                document.getElementById('label-temp').innerText = "Temperature";
+                document.getElementById('label-humidity').innerText = "Humidity";
+                document.getElementById('label-wind').innerText = "Wind & Dust Speed";
+                document.getElementById('label-attenuation').innerText = "RF Attenuation";
+                document.getElementById('map-heading').innerHTML = `<i class="fa-solid fa-map-location-dot text-blue-500"></i> Telecom Tower Distribution Map`;
+                document.getElementById('chart-heading').innerHTML = `<i class="fa-solid fa-chart-line text-blue-500"></i> Temp & RF Attenuation (24h Analysis)`;
+                document.getElementById('btn-refresh').innerText = "Refresh Data";
+                document.getElementById('alert-heading').innerHTML = `<i class="fa-solid fa-triangle-exclamation text-amber-500"></i> Early Warning Simulation`;
+                document.getElementById('alert-desc').innerText = "Simulate severe weather conditions to test automated network impact:";
+                document.getElementById('sim-dust').innerText = "Severe Dust Storm";
+                document.getElementById('sim-rain').innerText = "Heavy Rain & Storms";
+                document.getElementById('sim-normal').innerText = "Reset Normal Conditions";
+                document.getElementById('log-title').innerText = "Live Alert Stream:";
+                document.getElementById('table-heading').innerHTML = `<i class="fa-solid fa-database text-blue-500"></i> IoT Station Logs`;
+                document.getElementById('btn-export').innerText = "Export CSV";
+                document.getElementById('th-time').innerText = "Time";
+                document.getElementById('th-station').innerText = "Station / Tower";
+                document.getElementById('th-t').innerText = "Temp";
+                document.getElementById('th-h').innerText = "Humidity";
+                document.getElementById('th-atten').innerText = "Attenuation";
+                document.getElementById('th-status').innerText = "Status";
+                document.getElementById('st-stable').innerText = "Stable";
+                document.getElementById('st-stable2').innerText = "Stable";
+                document.getElementById('footer-text').innerText = "Weather Analytics & IoT Telecom Platform - Graduation Project & Advanced Web Development";
+            } else {
+                currentLang = 'ar';
+                html.setAttribute('dir', 'rtl');
+                html.setAttribute('lang', 'ar');
+                document.getElementById('lang-btn-text').innerText = "English";
+                document.getElementById('app-title').innerText = "محطة طقس الاتصالات الذكية";
+                document.getElementById('app-subtitle').innerText = "Weather & Telecom IoT Dashboard";
+                document.getElementById('label-temp').innerText = "درجة الحرارة";
+                document.getElementById('label-humidity').innerText = "نسبة الرطوبة";
+                document.getElementById('label-wind').innerText = "سرعة الرياح والغبار";
+                document.getElementById('label-attenuation').innerText = "فقدان الإشارة (RF Attenuation)";
+                document.getElementById('map-heading').innerHTML = `<i class="fa-solid fa-map-location-dot text-blue-500"></i> خريطة محطات الأبراج الموزعة`;
+                document.getElementById('chart-heading').innerHTML = `<i class="fa-solid fa-chart-line text-blue-500"></i> تحليل تغيرات الحرارة وفقدان الإشارة (24 ساعة)`;
+                document.getElementById('btn-refresh').innerText = "تحديث البيانات";
+                document.getElementById('alert-heading').innerHTML = `<i class="fa-solid fa-triangle-exclamation text-amber-500"></i> محاكاة الإنذار المبكر`;
+                document.getElementById('alert-desc').innerText = "قم بتجربة محاكاة الطقس السيء لمعرفة مدى تأثيره التلقائي على أداء الشبكة:";
+                document.getElementById('sim-dust').innerText = "عاصفة ترابية شديدة";
+                document.getElementById('sim-rain').innerText = "أمطار غزيرة وعواصف";
+                document.getElementById('sim-normal').innerText = "إعادة الحالة الطبيعية";
+                document.getElementById('log-title').innerText = "سجل التنبيهات الحية:";
+                document.getElementById('table-heading').innerHTML = `<i class="fa-solid fa-database text-blue-500"></i> سجل قراءات المحطات (IoT Streams)`;
+                document.getElementById('btn-export').innerText = "تصدير CSV";
+                document.getElementById('th-time').innerText = "الوقت";
+                document.getElementById('th-station').innerText = "المحطة / البرج";
+                document.getElementById('th-t').innerText = "الحرارة";
+                document.getElementById('th-h').innerText = "الرطوبة";
+                document.getElementById('th-atten').innerText = "فقدان الإشارة";
+                document.getElementById('th-status').innerText = "الحالة";
+                document.getElementById('st-stable').innerText = "مستقر";
+                document.getElementById('st-stable2').innerText = "مستقر";
+                document.getElementById('footer-text').innerText = "منصة تحليل الأنواء الجوية واتصالات الـ IoT - مشروع تخرج وتطوير برمجي متقدم";
+            }
+        }
+    </script>
+</body>
+</html>
